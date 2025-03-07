@@ -40,6 +40,24 @@ export default function TodoItem({ todo }: { todo: Item }) {
   const actionInProgress =
     isDeletingAll || (todo.completed && isClearingCompleted);
 
+  const isTogglingCompletion =
+    fetcher.state !== "idle" &&
+    fetcher.formData?.get("intent") === "toggle completion";
+
+  const isSaving =
+    fetcher.state !== "idle" && fetcher.formData?.get("intent") === "save task";
+
+  const completed = isTogglingCompletion
+    ? !JSON.parse(fetcher.formData?.get("completed") as string)
+    : todo.completed;
+
+  const completedAt =
+    isTogglingCompletion || !todo.completedAt ? new Date() : todo.completedAt;
+
+  const description = isSaving
+    ? (fetcher.formData?.get("description") as string)
+    : todo.description;
+
   return (
     <li
       className={`my-4 flex gap-4 border-b border-dashed border-gray-200 pb-4 last:border-none last:pb-0 dark:border-gray-700 ${
@@ -48,17 +66,15 @@ export default function TodoItem({ todo }: { todo: Item }) {
     >
       <fetcher.Form method="post">
         <input type="hidden" name="id" value={todo.id} />
-        <input type="hidden" name="completed" value={`${todo.completed}`} />
+        <input type="hidden" name="completed" value={`${completed}`} />
         <button
-          aria-label={`Mark task as ${
-            todo.completed ? "incomplete" : "complete"
-          }`}
+          aria-label={`Mark task as ${completed ? "incomplete" : "complete"}`}
           disabled={editing || actionInProgress}
           name="intent"
           value="toggle completion"
           className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-25 dark:border-gray-700 dark:hover:bg-gray-700"
         >
-          {todo.completed ? (
+          {completed ? (
             <SquareCheckIcon className="h-4 w-4" />
           ) : (
             <SquareIcon className="h-4 w-4" />
@@ -69,10 +85,10 @@ export default function TodoItem({ todo }: { todo: Item }) {
       {!editing && (
         <div
           className={`flex-1 space-y-0.5 ${
-            todo.completed || actionInProgress ? "opacity-25" : ""
+            completed || actionInProgress ? "opacity-25" : ""
           }`}
         >
-          <p>{todo.description}</p>
+          <p>{description}</p>
           <div className="space-y-0.5 text-xs">
             <p>
               Created at{" "}
@@ -80,11 +96,11 @@ export default function TodoItem({ todo }: { todo: Item }) {
                 {dateFormatter.format(new Date(todo.createdAt))}
               </time>
             </p>
-            {todo.completed && (
+            {completed && (
               <p>
                 Completed at{" "}
-                <time dateTime={`${new Date(todo.completedAt!).toISOString()}`}>
-                  {dateFormatter.format(new Date(todo.completedAt!))}
+                <time dateTime={`${new Date(completedAt!).toISOString()}`}>
+                  {dateFormatter.format(new Date(completedAt!))}
                 </time>
               </p>
             )}
@@ -124,7 +140,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
           <>
             <input
               name="description"
-              defaultValue={todo.description}
+              defaultValue={description}
               required
               className="flex-1 rounded-full border-2 px-3 py-2 text-sm text-black"
             />
@@ -141,7 +157,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
         ) : (
           <button
             aria-label="Edit task"
-            disabled={todo.completed || actionInProgress}
+            disabled={completed || actionInProgress}
             name="intent"
             value="edit task"
             className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-25 dark:border-gray-700 dark:hover:bg-gray-700"
@@ -151,7 +167,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
         )}
         <button
           aria-label="Delete task"
-          disabled={todo.completed || editing || actionInProgress}
+          disabled={completed || editing || actionInProgress}
           name="intent"
           value="delete task"
           className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-25 dark:border-gray-700 dark:hover:bg-gray-700"
