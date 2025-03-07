@@ -1,9 +1,53 @@
-import type { MetaFunction } from "@remix-run/node";
-import { json, Link, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs, MetaFunction } from "@remix-run/node";
+import { Form, json, Link, useFetcher, useLoaderData } from "@remix-run/react";
 import { todos } from "~/lib/db.server";
+
+import type { Item } from "~/types";
+
+import TodoList from "~/components/TodoList";
 
 export async function loader() {
   return json({ tasks: await todos.read() });
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+
+  const { intent, ...values } = Object.fromEntries(formData);
+
+  switch (intent) {
+    case "create task": {
+      const { description } = values;
+      return await todos.create(description as string);
+    }
+    case "toggle completion": {
+      const { id, completed } = values;
+
+      return await todos.update(id as string, {
+        completed: !JSON.parse(completed as string),
+        completedAt: !JSON.parse(completed as string) ? new Date() : undefined,
+      });
+    }
+    case "edit task": {
+      const { id } = values;
+
+      return await todos.update(id as string, { editing: true });
+    }
+    case "save task": {
+      const { id, description } = values;
+      return await todos.update(id as string, {
+        description: description as string,
+        editing: false,
+      });
+    }
+    case "delete task": {
+      const { id } = values;
+      return await todos.delete(id as string);
+    }
+    default: {
+      throw new Response("Unknown intent", { status: 400 });
+    }
+  }
 }
 
 export const meta: MetaFunction = () => {
@@ -18,6 +62,7 @@ export const meta: MetaFunction = () => {
 
 export default function Home() {
   const { tasks } = useLoaderData<typeof loader>();
+  const fetcher = useFetcher();
 
   return (
     <div className="flex flex-1 flex-col md:mx-auto md:w-[720px]">
@@ -33,7 +78,10 @@ export default function Home() {
       </header>
 
       <main className="flex-1 space-y-8">
-        <form className="rounded-full border border-gray-200 bg-white/90 shadow-md dark:border-gray-700 dark:bg-gray-900">
+        <fetcher.Form
+          method="post"
+          className="rounded-full border border-gray-200 bg-white/90 shadow-md dark:border-gray-700 dark:bg-gray-900"
+        >
           <fieldset className="flex items-center gap-2 p-2 text-sm">
             <input
               type="text"
@@ -42,19 +90,19 @@ export default function Home() {
               required
               className="flex-1 rounded-full border-2 border-gray-200 px-3 py-2 text-sm font-bold text-black dark:border-white/50"
             />
-            <button className="rounded-full border-2 border-gray-200/50 bg-gradient-to-tl from-[#00fff0] to-[#0083fe] px-3 py-2 text-base font-black transition hover:scale-105 hover:border-gray-500 sm:px-6 dark:border-white/50 dark:from-[#8e0e00] dark:to-[#1f1c18] dark:hover:border-white">
+            <button
+              name="intent"
+              value="create task"
+              className="rounded-full border-2 border-gray-200/50 bg-gradient-to-tl from-[#00fff0] to-[#0083fe] px-3 py-2 text-base font-black transition hover:scale-105 hover:border-gray-500 sm:px-6 dark:border-white/50 dark:from-[#8e0e00] dark:to-[#1f1c18] dark:hover:border-white"
+            >
               Add
             </button>
           </fieldset>
-        </form>
+        </fetcher.Form>
 
         <div className="rounded-3xl border border-gray-200 bg-white/90 px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
           {tasks.length > 0 ? (
-            <ul>
-              {tasks.map((task) => (
-                <li key={task}>{task}</li>
-              ))}
-            </ul>
+            <TodoList todos={tasks as unknown as Item[]} />
           ) : (
             <p className="text-center leading-7">No tasks available</p>
           )}
