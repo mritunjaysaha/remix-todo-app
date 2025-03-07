@@ -1,4 +1,4 @@
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, useFetchers } from "@remix-run/react";
 import { useState } from "react";
 import type { Item } from "~/types";
 
@@ -19,10 +19,26 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
 });
 
 export default function TodoItem({ todo }: { todo: Item }) {
+  const fetchers = useFetchers();
   const fetcher = useFetcher();
   const [isEditing, setIsEditing] = useState(false);
 
   const editing = typeof document !== "undefined" ? isEditing : todo.editing;
+
+  const isClearingCompleted = fetchers.some(
+    (fetcher) =>
+      fetcher.state === "submitting" &&
+      fetcher.formData?.get("intent") === "clear completed"
+  );
+
+  const isDeletingAll = fetchers.some(
+    (fetcher) =>
+      fetcher.state === "submitting" &&
+      fetcher.formData?.get("intent") === "deleting all"
+  );
+
+  const actionInProgress =
+    isDeletingAll || (todo.completed && isClearingCompleted);
 
   return (
     <li
@@ -37,7 +53,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
           aria-label={`Mark task as ${
             todo.completed ? "incomplete" : "complete"
           }`}
-          disabled={editing}
+          disabled={editing || actionInProgress}
           name="intent"
           value="toggle completion"
           className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-25 dark:border-gray-700 dark:hover:bg-gray-700"
@@ -52,7 +68,9 @@ export default function TodoItem({ todo }: { todo: Item }) {
 
       {!editing && (
         <div
-          className={`flex-1 space-y-0.5 ${todo.completed ? "opacity-25" : ""}`}
+          className={`flex-1 space-y-0.5 ${
+            todo.completed || actionInProgress ? "opacity-25" : ""
+          }`}
         >
           <p>{todo.description}</p>
           <div className="space-y-0.5 text-xs">
@@ -112,6 +130,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
             />
             <button
               aria-label="Save task"
+              disabled={actionInProgress}
               name="intent"
               value="save task"
               className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 dark:border-gray-700 dark:hover:bg-gray-700"
@@ -122,7 +141,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
         ) : (
           <button
             aria-label="Edit task"
-            disabled={todo.completed}
+            disabled={todo.completed || actionInProgress}
             name="intent"
             value="edit task"
             className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-25 dark:border-gray-700 dark:hover:bg-gray-700"
@@ -132,7 +151,7 @@ export default function TodoItem({ todo }: { todo: Item }) {
         )}
         <button
           aria-label="Delete task"
-          disabled={todo.completed || editing}
+          disabled={todo.completed || editing || actionInProgress}
           name="intent"
           value="delete task"
           className="rounded-full border border-gray-200 p-1 transition hover:bg-gray-200 disabled:pointer-events-none disabled:opacity-25 dark:border-gray-700 dark:hover:bg-gray-700"

@@ -1,9 +1,17 @@
 import type { ActionFunctionArgs, MetaFunction } from "@remix-run/node";
-import { Form, json, Link, useFetcher, useLoaderData } from "@remix-run/react";
+import {
+  Form,
+  Link,
+  json,
+  useFetcher,
+  useLoaderData,
+  useSearchParams,
+} from "@remix-run/react";
 import { todos } from "~/lib/db.server";
+import { useEffect, useRef } from "react";
+import type { Item, View } from "~/types";
 
-import type { Item } from "~/types";
-
+import TodoActions from "~/components/TodoActions";
 import TodoList from "~/components/TodoList";
 
 export async function loader() {
@@ -44,6 +52,12 @@ export async function action({ request }: ActionFunctionArgs) {
       const { id } = values;
       return await todos.delete(id as string);
     }
+    case "clear completed": {
+      return await todos.clearCompleted();
+    }
+    case "delete all": {
+      return await todos.deleteAll();
+    }
     default: {
       throw new Response("Unknown intent", { status: 400 });
     }
@@ -63,6 +77,21 @@ export const meta: MetaFunction = () => {
 export default function Home() {
   const { tasks } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
+  const [searchParams] = useSearchParams();
+  const view = searchParams.get("view") || "all";
+  const addFormRef = useRef<HTMLFormElement>(null);
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  const isAdding =
+    fetcher.state === "submitting" &&
+    fetcher.formData?.get("intent") === "create task";
+
+  useEffect(() => {
+    if (!isAdding) {
+      addFormRef.current?.reset();
+      addInputRef.current?.focus();
+    }
+  });
 
   return (
     <div className="flex flex-1 flex-col md:mx-auto md:w-[720px]">
@@ -79,11 +108,16 @@ export default function Home() {
 
       <main className="flex-1 space-y-8">
         <fetcher.Form
+          ref={addFormRef}
           method="post"
           className="rounded-full border border-gray-200 bg-white/90 shadow-md dark:border-gray-700 dark:bg-gray-900"
         >
-          <fieldset className="flex items-center gap-2 p-2 text-sm">
+          <fieldset
+            disabled={isAdding}
+            className="flex items-center gap-2 p-2 text-sm"
+          >
             <input
+              ref={addInputRef}
               type="text"
               name="description"
               placeholder="Create a new todo..."
@@ -95,56 +129,54 @@ export default function Home() {
               value="create task"
               className="rounded-full border-2 border-gray-200/50 bg-gradient-to-tl from-[#00fff0] to-[#0083fe] px-3 py-2 text-base font-black transition hover:scale-105 hover:border-gray-500 sm:px-6 dark:border-white/50 dark:from-[#8e0e00] dark:to-[#1f1c18] dark:hover:border-white"
             >
-              Add
+              {isAdding ? "Adding..." : "Add"}
             </button>
           </fieldset>
         </fetcher.Form>
 
         <div className="rounded-3xl border border-gray-200 bg-white/90 px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
-          {tasks.length > 0 ? (
-            <TodoList todos={tasks as unknown as Item[]} />
-          ) : (
-            <p className="text-center leading-7">No tasks available</p>
-          )}
+          <TodoList todos={tasks as unknown as Item[]} view={view as View} />{" "}
         </div>
 
         <div className="rounded-3xl border border-gray-200 bg-white/90 px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
-          <div className="flex items-center justify-between gap-4 text-sm">
-            <p className="text-center leading-7">
-              {tasks.length} {tasks.length === 1 ? "item" : "items"} left
-            </p>
-            <div className="flex items-center gap-4">
-              <button className="text-red-400 transition hover:text-red-600">
-                Clear Completed
-              </button>
-              <button className="text-red-400 transition hover:text-red-600">
-                Delete All
-              </button>
-            </div>
-          </div>
+          <TodoActions tasks={tasks as unknown as Item[]} />
         </div>
 
         <div className="rounded-3xl border border-gray-200 bg-white/90 px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
-          <div className="flex items-center justify-center gap-12 text-sm">
+          <Form className="flex items-center justify-center gap-12 text-sm">
             <button
               aria-label="View all tasks"
-              className="opacity-50 transition hover:opacity-100"
+              className={`transition ${
+                view === "all" ? "font-bold" : "opacity-50 hover:opacity-100"
+              }`}
+              name="view"
+              value="all"
             >
               All
             </button>
             <button
               aria-label="View active tasks"
-              className="opacity-50 transition hover:opacity-100"
+              className={`transition ${
+                view === "active" ? "font-bold" : "opacity-50 hover:opacity-100"
+              }`}
+              name="view"
+              value="active"
             >
               Active
             </button>
             <button
               aria-label="View completed"
-              className="opacity-50 transition hover:opacity-100"
+              className={`transition ${
+                view === "completed"
+                  ? "font-bold"
+                  : "opacity-50 hover:opacity-100"
+              }`}
+              name="view"
+              value="completed"
             >
               Completed
             </button>
-          </div>
+          </Form>
         </div>
       </main>
 
