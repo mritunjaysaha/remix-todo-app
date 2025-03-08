@@ -84,3 +84,12 @@ export interface Todo {
 }
 
 export type View = "all" | "active" | "completed";
+
+/**
+ * Represents the available theme options for the application.
+ *
+ * - "system": Follows the system's color scheme, but defaults to light if JavaScript is disabled.
+ * - "light": Applies the light color scheme.
+ * - "dark": Applies the dark color scheme.
+ */
+export type Theme = "system" | "light" | "dark";
